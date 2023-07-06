@@ -2,16 +2,19 @@ import numpy as np
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 import copy
-from math import cos, sin
+# from math import cos, sin
 
 pc_0 = o3d.io.read_point_cloud("point_cloud_1.pcd")
 pc_1 = o3d.io.read_point_cloud("point_cloud_2.pcd")
 pc_2 = o3d.io.read_point_cloud("point_cloud_3.pcd")
+
 pose_0 = np.array([0.45, 0.3, 0.4, 0.925, 0.0, 0.0, 0.381])
 pose_1 = np.array([0.45, 0.0, 0.4, 1.0, 0.0, 0.0, 0.0])
 pose_2 = np.array([0.45, -0.3, 0.4, -0.925, 0.0, 0.0, 0.381])
 
 coord = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1, origin=[0,0,0])
+
+# create coord frame for camera, end effector, and franka base
 
 # Downsample the point clouds
 voxel_size = 0.01
@@ -58,25 +61,38 @@ def pose_to_trans_matrix(pose):
     
     return T_w_r
 
-T0W = pose_to_trans_matrix(pose_0)
-# print("T0W Rotation", T0W[:3, :3])
-pcd_0.transform(T0W)
 
-T1W = pose_to_trans_matrix(pose_1)
-# print("T1W Rotation", T1W[:3, :3])
-pcd_1.transform(T1W)
+# Camera frame in EE Frame via callibration
+T_ec = np.eye(4)
+Rz = R.from_euler('z', np.pi/2).as_matrix()
+# Rx = R.from_euler('x', np.pi).as_matrix()
+R_ec = Rz 
+T_ec[:3, :3] = R_ec
+T_ec[0, 3] = 0.02
+T_ec[1, 3] = 0.0
+T_ec[2, 3] = 0.0
 
-T2W = pose_to_trans_matrix(pose_2)
-# print("T2W Rotation", T2W[:3, :3])
-pcd_2.transform(T2W)
-o3d.visualization.draw_geometries([ pcd_0, pcd_1, pcd_2, coord])
+# T_fe x T_ec x P_c = P_f i.e in order to transform the pc into the franka base frame, we need to transform it into the end effector frame first
+T_fe0 = pose_to_trans_matrix(pose_0)
+T_f0 = T_fe0.dot(T_ec)
+# pcd_0.transform(T_f0)
+
+T_fe1 = pose_to_trans_matrix(pose_1)
+T_f1 = T_fe1.dot(T_ec)
+# pcd_1.transform(T_f1)
+
+T_fe2 = pose_to_trans_matrix(pose_2)
+T_f2 = T_fe2.dot(T_ec)
+# pcd_2.transform(T_f2)
+
+# o3d.visualization.draw_geometries([pcd_0, pcd_1, pcd_2, coord])
 
 
 
 # MANUAL Method
 T01 = np.eye(4) # Manual transformation matrix between pcd2 and pcd1
 T01[:3, :3] = pcd_0.get_rotation_matrix_from_xyz((0, -(np.pi/6) - np.pi/36, 0)) # Rotate 35 degrees around neg y-axis
-print("Manual 0 to 1", T01[:3, :3])
+# print("Manual 0 to 1", T01[:3, :3])
 T01[0, 3] = -0.3 # Translate 0.3 meters along x-axis
 trans_pcd_0 = copy.deepcopy(pcd_0).transform(T01)
 # o3d.visualization.draw_geometries([pcd_1, trans_pcd_0, coord])
