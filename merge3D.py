@@ -65,8 +65,8 @@ def pose_to_trans_matrix(pose):
 # Camera frame in EE Frame via callibration
 T_ec = np.eye(4)
 Rz = R.from_euler('z', np.pi/2).as_matrix()
-# Rx = R.from_euler('x', np.pi).as_matrix()
-R_ec = Rz 
+Rx = R.from_euler('x', np.pi).as_matrix()
+R_ec = Rx.dot(Rz)
 T_ec[:3, :3] = R_ec
 T_ec[0, 3] = 0.02
 T_ec[1, 3] = 0.0
@@ -75,17 +75,19 @@ T_ec[2, 3] = 0.0
 # T_fe x T_ec x P_c = P_f i.e in order to transform the pc into the franka base frame, we need to transform it into the end effector frame first
 T_fe0 = pose_to_trans_matrix(pose_0)
 T_f0 = T_fe0.dot(T_ec)
-# pcd_0.transform(T_f0)
+pcd_0.transform(T_f0)
 
 T_fe1 = pose_to_trans_matrix(pose_1)
 T_f1 = T_fe1.dot(T_ec)
-# pcd_1.transform(T_f1)
+reg_p2p_f1 = o3d.pipelines.registration.registration_icp(pcd_1, pcd_0, 0.02, T_f1, o3d.pipelines.registration.TransformationEstimationPointToPoint())
+pcd_1.transform(reg_p2p_f1.transformation)
 
 T_fe2 = pose_to_trans_matrix(pose_2)
 T_f2 = T_fe2.dot(T_ec)
-# pcd_2.transform(T_f2)
+reg_p2p_f2 = o3d.pipelines.registration.registration_icp(pcd_2, pcd_0, 0.02, T_f2, o3d.pipelines.registration.TransformationEstimationPointToPoint())
+pcd_2.transform(reg_p2p_f2.transformation)
 
-# o3d.visualization.draw_geometries([pcd_0, pcd_1, pcd_2, coord])
+o3d.visualization.draw_geometries([pcd_0, pcd_1, pcd_2, coord])
 
 
 
@@ -110,7 +112,7 @@ trans_pcd_2 = copy.deepcopy(pcd_2).transform(T21)
 # pcd_merged = pcd_1 +  trans_pcd_0 + trans_pcd_2
 # o3d.visualization.draw_geometries([pcd_merged, coord])
 
-print("Applying point-to-point ICP to pcd_0")
+# print("Applying point-to-point ICP to pcd_0")
 thresh = 0.02
 reg_p2p_01 = o3d.pipelines.registration.registration_icp( pcd_0, pcd_1, thresh, T01, o3d.pipelines.registration.TransformationEstimationPointToPoint())
 # print(reg_p2p_01)
@@ -118,7 +120,7 @@ reg_p2p_01 = o3d.pipelines.registration.registration_icp( pcd_0, pcd_1, thresh, 
 # print(reg_p2p_01.transformation)
 trans_pcd_0 = copy.deepcopy(pcd_0).transform(reg_p2p_01.transformation)
 
-print("Applying point-to-point ICP to pcd_2")
+# print("Applying point-to-point ICP to pcd_2")
 reg_p2p_21 = o3d.pipelines.registration.registration_icp( pcd_2, pcd_1, thresh, T21, o3d.pipelines.registration.TransformationEstimationPointToPoint())
 # print(reg_p2p_21)
 # print("Transformation is:")
