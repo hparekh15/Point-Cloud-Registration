@@ -10,7 +10,7 @@ config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 pipeline.start(config)
 
 try:
-    counter = 1 
+    counter = 4
 
     while True:
         # Wait for Enter key
@@ -40,7 +40,7 @@ try:
         o3d.io.write_point_cloud(f"point_cloud_{counter}.ply", pcd)
 
         # Save point cloud to XYZ file
-        np.savetxt(f"point_cloud_{counter}.xyz", point_cloud_array, delimiter=" ", fmt="%f")
+        # np.savetxt(f"point_cloud_{counter}.xyz", point_cloud_array, delimiter=" ", fmt="%f")
 
         counter += 1  # Increment the counter
 
