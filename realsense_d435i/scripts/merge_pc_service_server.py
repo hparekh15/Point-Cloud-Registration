@@ -3,7 +3,9 @@
 import rospy
 import ros_numpy
 import numpy as np
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs import point_cloud2 as pc2
+from std_msgs.msg import Header
 from geometry_msgs.msg import Pose
 from std_srvs.srv import Empty, EmptyResponse
 import open3d as o3d
@@ -19,6 +21,9 @@ class PointCloudMerge:
         sub1 = rospy.Subscriber('camera/depth/color/points', PointCloud2, self.callback_pc)
         sub2 = rospy.Subscriber('/franka_state_controller/ee_pose', Pose, self.callback_ee)
         merge_pc_service = rospy.Service('merge_pc_service', Empty, self.merge_pc)
+        self.fields = [PointField('x', 0, PointField.FLOAT32, 1),
+                          PointField('y', 4, PointField.FLOAT32, 1),
+                          PointField('z', 8, PointField.FLOAT32, 1)]
 
         self.cam2ee_pose = np.array([0.039201112671531854,  -0.035492796694330614, 0.07041605649874202, 0.013750894072379439,-0.005628437392997249, 0.7093345722195382,  0.7047153313635571])
         self.H_ec = self.pose_to_trans_matrix(self.cam2ee_pose)
@@ -89,10 +94,13 @@ class PointCloudMerge:
             rospy.loginfo("0th captured")
 
             # Publish workspace point cloud as PC2 message
-            # np_points = np.asarray(self.workspace_pc.points)
-            # workspace_pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points)
-            # self.pub.publish(workspace_pc2_msg)
-            # rospy.loginfo("Workspace point cloud published")
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "franka_base"
+            points = np.asarray(self.workspace_pc.points)
+            workspace_pc2_msg = pc2.create_cloud(header, self.fields, points)
+            self.pub.publish(workspace_pc2_msg)
+            rospy.loginfo("Workspace point cloud published")
         else:
             # Capture new pc and calculate Transformation to franka base frame
             o3d_pc = self.capture_pc()
@@ -113,10 +121,13 @@ class PointCloudMerge:
             self.counter += 1
 
             # Publish workspace point cloud as PC2 message
-            # np_points = np.asarray(self.workspace_pc.points)
-            # workspace_pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points)
-            # self.pub.publish(workspace_pc2_msg)
-            # rospy.loginfo("Workspace point cloud published")
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "franka_base"
+            points = np.asarray(self.workspace_pc.points)
+            workspace_pc2_msg = pc2.create_cloud(header, self.fields, points)
+            self.pub.publish(workspace_pc2_msg)
+            rospy.loginfo("Workspace point cloud published")
 
         return EmptyResponse()
 
