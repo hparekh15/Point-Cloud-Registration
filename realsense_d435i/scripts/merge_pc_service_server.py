@@ -17,7 +17,7 @@ class PointCloudMerge:
         
         pub = rospy.Publisher('workspace_pc', PointCloud2, queue_size=10)
         sub1 = rospy.Subscriber('camera/depth/color/points', PointCloud2, self.callback_pc)
-        sub2 = rospy.Subscriber('ee_pose', Pose, self.callback_ee)
+        sub2 = rospy.Subscriber('/franka_state_controller/ee_pose', Pose, self.callback_ee)
         merge_pc_service = rospy.Service('merge_pc_service', Empty, self.merge_pc)
 
         self.cam2ee_pose = np.array([0.039201112671531854,  -0.035492796694330614, 0.07041605649874202, 0.013750894072379439,-0.005628437392997249, 0.7093345722195382,  0.7047153313635571])
@@ -44,19 +44,8 @@ class PointCloudMerge:
 
             # Convert Numpy to Open3D PointCloud and process
             pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(np_pc) # Convert Numpy to Open3D PointCloud
+            pcd.points = o3d.utility.Vector3dVector(np_pc) 
             processed_pc = self.process_pointcloud(pcd)
-
-            # Convert back to numpy and then to PointCloud2 message and publish
-            # np_points = np.asarray(processed_pc.points)
-            # print("Processed PC shape", np_points.shape)
-            # pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points, self.pc2_msg.header)
-            # self.pub.publish(pc2_msg) 
-            # rospy.loginfo("Point cloud published")
-
-            # Save point cloud to file locally
-            # o3d.io.write_point_cloud(f"pcd_{self.counter}.xyz", processed_pc)
-            # self.counter += 1
             
         return processed_pc
     
@@ -67,7 +56,7 @@ class PointCloudMerge:
         clean_cloud, ind = o3d_pc.remove_statistical_outlier(nb_neighbors=30, std_ratio=0.9)
         return clean_cloud
     
-    def pose_to_trans_matrix(pose):
+    def pose_to_trans_matrix(self, pose):
         """
         returns transformation matrix from pose
         ---
@@ -91,15 +80,19 @@ class PointCloudMerge:
     
     def merge_pc(self, req):
         if self.workspace_pc is None:
-            # Capture and save 1st point cloud
-            self.workspace_pc = self.capture_pc()
+            # Capture. Transform and save 1st point cloud
+            self.workspace_pc = self.capture_pc()	
+            H_fe = self.pose_to_trans_matrix(self.ee_pose)
+            H_fc = H_fe @ self.H_ec
+            self.workspace_pc.transform(H_fc)
             o3d.io.write_point_cloud("workspace_pcd_0.xyz", self.workspace_pc)
+            rospy.loginfo("0th captured")
 
             # Publish workspace point cloud as PC2 message
-            np_points = np.asarray(self.workspace_pc.points)
-            workspace_pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points, self.pc2_msg.header)
-            self.pub.publish(workspace_pc2_msg)
-            rospy.loginfo("Workspace point cloud published")
+            # np_points = np.asarray(self.workspace_pc.points)
+            # workspace_pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points)
+            # self.pub.publish(workspace_pc2_msg)
+            # rospy.loginfo("Workspace point cloud published")
         else:
             # Capture new pc and calculate Transformation to franka base frame
             o3d_pc = self.capture_pc()
@@ -120,10 +113,10 @@ class PointCloudMerge:
             self.counter += 1
 
             # Publish workspace point cloud as PC2 message
-            np_points = np.asarray(self.workspace_pc.points)
-            workspace_pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points, self.pc2_msg.header)
-            self.pub.publish(workspace_pc2_msg)
-            rospy.loginfo("Workspace point cloud published")
+            # np_points = np.asarray(self.workspace_pc.points)
+            # workspace_pc2_msg = ros_numpy.point_cloud2.array_to_pointcloud2(np_points)
+            # self.pub.publish(workspace_pc2_msg)
+            # rospy.loginfo("Workspace point cloud published")
 
         return EmptyResponse()
 
