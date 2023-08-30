@@ -17,7 +17,7 @@ class PointCloudMerge:
         self.workspace_pc = None
         self.ee_pose = None
         
-        pub = rospy.Publisher('workspace_pc', PointCloud2, queue_size=10)
+        self.pub = rospy.Publisher('workspace_pc', PointCloud2, queue_size=10)
         sub1 = rospy.Subscriber('camera/depth/color/points', PointCloud2, self.callback_pc)
         sub2 = rospy.Subscriber('/franka_state_controller/ee_pose', Pose, self.callback_ee)
         merge_pc_service = rospy.Service('merge_pc_service', Empty, self.merge_pc)
