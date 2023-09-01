@@ -31,7 +31,6 @@ pose_4 = np.array([0.4628885303619983, -0.30476017841252845, 0.4869179383359469,
 # Camera Pose wrt EE:
 cam2ee_pose = np.array([0.039201112671531854,  -0.035492796694330614, 0.07041605649874202, 0.013750894072379439,-0.005628437392997249, 0.7093345722195382,  0.7047153313635571])
 
-
 # Visazlize point clouds:
 o3d.visualization.draw_geometries([pc_0, pc_4, coordinate_frame])
 
@@ -130,7 +129,7 @@ def draw_registration_result(source, target, H):
     target_temp = copy.deepcopy(target)
     source_temp.paint_uniform_color([1, 0.706, 0])
     target_temp.paint_uniform_color([0, 0.651, 0.929])
-    source_temp.transform(H) # Avoid transforming in display fn
+    # source_temp.transform(H) # Avoid transforming in display fn
     o3d.visualization.draw_geometries([source_temp, target_temp])
     
 def preprocess_point_cloud(pcd, voxel_size):
@@ -163,9 +162,6 @@ def prepare_dataset(source, target, H, voxel_size):
 
     return source, target, source_down, target_down, source_fpfh, target_fpfh
 
-voxel_size = 0.02  # means 1cm for this dataset
-# source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pc_1, pc_0, H_f1, voxel_size)
-source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pc_4, pc_0, H_f4, voxel_size)
 
 def execute_global_registration(source_down, target_down, source_fpfh, target_fpfh, voxel_size):
     distance_threshold = voxel_size * 5
@@ -183,11 +179,6 @@ def execute_global_registration(source_down, target_down, source_fpfh, target_fp
         o3d.pipelines.registration.RANSACConvergenceCriteria(iter, conf))
     return result
 
-result_ransac = execute_global_registration(source_down, target_down, source_fpfh, target_fpfh, voxel_size)
-print(result_ransac)
-draw_registration_result(source_down, target_down, result_ransac.transformation)
-
-
 def refine_registration(source, target, source_fpfh, target_fpfh, voxel_size):
     distance_threshold = voxel_size * 0.4
     print(":: Point-to-plane ICP registration is applied on original point")
@@ -197,6 +188,13 @@ def refine_registration(source, target, source_fpfh, target_fpfh, voxel_size):
         source, target, distance_threshold, result_ransac.transformation,
         o3d.pipelines.registration.TransformationEstimationPointToPlane())
     return result
+
+voxel_size = 0.02  # means 1cm for this dataset
+# source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pc_1, pc_0, H_f1, voxel_size)
+source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pc_4, pc_0, H_f4, voxel_size)
+result_ransac = execute_global_registration(source_down, target_down, source_fpfh, target_fpfh, voxel_size)
+print(result_ransac)
+draw_registration_result(source_down, target_down, result_ransac.transformation)
 
 result_icp = refine_registration(source, target, source_fpfh, target_fpfh, voxel_size)
 print(result_icp)
