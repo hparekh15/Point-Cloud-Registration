@@ -39,11 +39,12 @@ class PointCloudMerge:
         self.ee_pose = np.array([msg.position.x, msg.position.y, msg.position.z, msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w])
 
     def capture_pc(self):
-        
-        rospy.loginfo("Capturing point cloud")
+        if self.ee_pose is None:
+            rospy.logwarn("No ee_pose received")
         if self.pc2_msg is None:
             rospy.logwarn("No PointCloud2 message received")
         else:
+            rospy.loginfo("Capturing point cloud")
             np_pc = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(self.pc2_msg)
             print("Captured PC shape", np_pc.shape)
 
@@ -94,13 +95,13 @@ class PointCloudMerge:
             rospy.loginfo("0th captured")
 
             # Publish workspace point cloud as PC2 message
-            header = Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = "franka_base"
-            points = np.asarray(self.workspace_pc.points)
-            workspace_pc2_msg = pc2.create_cloud(header, self.fields, points)
-            self.pub.publish(workspace_pc2_msg)
-            rospy.loginfo("Workspace point cloud published")
+            # header = Header()
+            # header.stamp = rospy.Time.now()
+            # header.frame_id = "franka_base"
+            # points = np.asarray(self.workspace_pc.points)
+            # workspace_pc2_msg = pc2.create_cloud(header, self.fields, points)
+            # self.pub.publish(workspace_pc2_msg)
+            # rospy.loginfo("Workspace point cloud published")
         else:
             # Capture new pc and calculate Transformation to franka base frame
             o3d_pc = self.capture_pc()
@@ -111,6 +112,10 @@ class PointCloudMerge:
             reg_p2p = o3d.pipelines.registration.registration_icp(o3d_pc, self.workspace_pc, self.icp_threshold, H_fc, o3d.pipelines.registration.TransformationEstimationPointToPoint())
             o3d_pc.transform(reg_p2p.transformation)
 
+            # Save current point cloud to file locally
+            o3d.io.write_point_cloud(f"pcd_{self.counter}.xyz", o3d_pc)
+            rospy.loginfo(f"pcd_{self.counter} saved locally")
+
             # Merge point cloud with workspace point cloud
             rospy.loginfo("Merging point clouds")
             self.workspace_pc += o3d_pc
@@ -118,16 +123,17 @@ class PointCloudMerge:
 
             # Save point cloud to file locally
             o3d.io.write_point_cloud(f"workspace_pcd_{self.counter}.xyz", self.workspace_pc)
+            rospy.loginfo(f"workspace_pcd_{self.counter} saved locally")
             self.counter += 1
 
             # Publish workspace point cloud as PC2 message
-            header = Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = "franka_base"
-            points = np.asarray(self.workspace_pc.points)
-            workspace_pc2_msg = pc2.create_cloud(header, self.fields, points)
-            self.pub.publish(workspace_pc2_msg)
-            rospy.loginfo("Workspace point cloud published")
+            # header = Header()
+            # header.stamp = rospy.Time.now()
+            # header.frame_id = "franka_base"
+            # points = np.asarray(self.workspace_pc.points)
+            # workspace_pc2_msg = pc2.create_cloud(header, self.fields, points)
+            # self.pub.publish(workspace_pc2_msg)
+            # rospy.loginfo("Workspace point cloud published")
 
         return EmptyResponse()
 
