@@ -69,7 +69,7 @@ H_ec = pose_to_trans_matrix(cam2ee_pose)
 
 # Transform point clouds to Franka Base Frame and register:
 H_f0 = transformation_to_franka_base(pose_0, H_ec)
-pc_0.transform(H_f0) # TARGET PC
+# pc_0.transform(H_f0) # TARGET PC
 
 H_f1 = transformation_to_franka_base(pose_1, H_ec)
 # pc_1.transform(H_f1)
@@ -84,7 +84,7 @@ H_f4 = transformation_to_franka_base(pose_4, H_ec)
 # pc_4.transform(H_f4) 
 
 # Visazlize point clouds:
-o3d.visualization.draw_geometries([pc_0, pc_4, coordinate_frame])
+# o3d.visualization.draw_geometries([pc_0, pc_4, coordinate_frame])
 
 # Merge point clouds & Display:
 # pcd_merged = pcd_0 +  pcd_1 + pcd_2 + pcd_3 + pcd_4
@@ -121,15 +121,14 @@ def display_inlier_outlier(cloud, ind):
 
 # GLOBAL REGISTRATION:
 
-def draw_registration_result(source, target, H):
+def draw_registration_result(source, target):
     """
-    displays registration result after transformation
+    displays registration result 
     """
     source_temp = copy.deepcopy(source)
     target_temp = copy.deepcopy(target)
     source_temp.paint_uniform_color([1, 0.706, 0])
     target_temp.paint_uniform_color([0, 0.651, 0.929])
-    # source_temp.transform(H) # Avoid transforming in display fn
     o3d.visualization.draw_geometries([source_temp, target_temp])
     
 def preprocess_point_cloud(pcd, voxel_size):
@@ -164,7 +163,7 @@ def prepare_dataset(source, target, H, voxel_size):
 
 
 def execute_global_registration(source_down, target_down, source_fpfh, target_fpfh, voxel_size):
-    distance_threshold = voxel_size * 5
+    distance_threshold = voxel_size * 1.5
     iter = 100000
     conf = 0.999
     print(":: RANSAC registration on downsampled point clouds.")
@@ -179,23 +178,39 @@ def execute_global_registration(source_down, target_down, source_fpfh, target_fp
         o3d.pipelines.registration.RANSACConvergenceCriteria(iter, conf))
     return result
 
-def refine_registration(source, target, source_fpfh, target_fpfh, voxel_size):
+def refine_registration(source, target, source_fpfh, target_fpfh, H, voxel_size):
     distance_threshold = voxel_size * 0.4
     print(":: Point-to-plane ICP registration is applied on original point")
     print("   clouds to refine the alignment. This time we use a strict")
     print("   distance threshold %.3f." % distance_threshold)
     result = o3d.pipelines.registration.registration_icp(
-        source, target, distance_threshold, result_ransac.transformation,
-        o3d.pipelines.registration.TransformationEstimationPointToPlane())
+        source, target, distance_threshold, H.transformation,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint())
     return result
 
-voxel_size = 0.02  # means 1cm for this dataset
-# source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pc_1, pc_0, H_f1, voxel_size)
-source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pc_4, pc_0, H_f4, voxel_size)
-result_ransac = execute_global_registration(source_down, target_down, source_fpfh, target_fpfh, voxel_size)
-print(result_ransac)
-draw_registration_result(source_down, target_down, result_ransac.transformation)
+# Global Registration Pipeline:
+# Load point clouds:
+target = pc_0.transform(H_f0)
+source  = pc_4
 
-result_icp = refine_registration(source, target, source_fpfh, target_fpfh, voxel_size)
-print(result_icp)
-draw_registration_result(source, target, result_icp.transformation)
+# Apply initial transformation to point cloud:
+source.transform(H_f4)
+
+# Visazlize Raw transformed point clouds:
+# o3d.visualization.draw_geometries([source, target, coordinate_frame])
+
+# Preprocess point clouds:
+voxel_size = 0.02  # means 5cm for this dataset
+source_down, source_fpfh = preprocess_point_cloud(source, voxel_size)
+target_down, target_fpfh = preprocess_point_cloud(target, voxel_size)
+
+# Execute global registration:
+global_result = execute_global_registration(source_down, target_down, source_fpfh, target_fpfh, voxel_size)
+source.transform(global_result.transformation)
+
+# Refine registration:
+refined_result = refine_registration(source, target, source_fpfh, target_fpfh, global_result, voxel_size)
+source.transform(refined_result.transformation)
+
+# Display registration result:
+draw_registration_result(source, target)
